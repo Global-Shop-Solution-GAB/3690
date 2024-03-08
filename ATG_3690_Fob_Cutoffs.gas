@@ -1,0 +1,114 @@
+Program.Sub.ScreenSU.Start
+gui.Form1..create
+gui.Form1..caption("FOB Cutoffs")
+gui.Form1..size(4380,2475)
+gui.Form1..position(0,0)
+gui.Form1..event(unload,form1_unload)
+gui.Form1..alwaysontop(False)
+gui.Form1..fontname("Arial")
+gui.Form1..fontsize(8)
+gui.Form1..forecolor(0)
+gui.Form1..fontstyle(,,,,)
+gui.Form1..BackColor(-2147483633)
+gui.Form1..controlbox(True)
+gui.Form1..maxbutton(True)
+gui.Form1..minbutton(True)
+gui.Form1..mousepointer(0)
+gui.Form1..moveable(True)
+gui.Form1..sizeable(True)
+gui.Form1..ShowInTaskBar(True)
+gui.Form1..titlebar(True)
+gui.Form1.lbl1.create(label,"Customer",True,735,255,0,690,200,True,0,Arial,8,-2147483633,0)
+gui.Form1.lbl2.create(label,"Cutoff Value",True,990,255,0,2485,200,True,0,Arial,8,-2147483633,0)
+gui.Form1.txtCust.create(textbox,"",True,1215,300,0,475,500,False,0,Arial,8,-2147483643,1)
+gui.Form1.txtCutoff.create(textbox,"",True,1215,300,0,2360,500,True,0,Arial,8,-2147483643,1)
+gui.Form1.txtCutoff.numericonly(1)
+gui.Form1.txtCutoff.maxLength(14)
+gui.Form1.cmdSave.create(button)
+gui.Form1.cmdSave.caption("Save")
+gui.Form1.cmdSave.visible(True)
+gui.Form1.cmdSave.size(855,375)
+gui.Form1.cmdSave.zorder(0)
+gui.Form1.cmdSave.position(1530,1170)
+gui.Form1.cmdSave.enabled(True)
+gui.Form1.cmdSave.fontname("Arial")
+gui.Form1.cmdSave.fontsize(8)
+gui.Form1.cmdSave.event(click,cmdsave_click)
+
+
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+' 4/5/2010
+' JSO
+' For House of Doolittle quote 1178
+' Screen interface to set custom FOB cutoff
+' 14360
+
+
+Function.ODBC.Connection!con.OpenConnection(Variable.Ambient.PDSN,Variable.Ambient.PUser,Variable.Ambient.PPass,180)
+
+Function.Intrinsic.Control.CallSub(Loaddata)
+
+Gui.Form1..Show
+
+Program.Sub.Main.End
+
+program.sub.cmdsave_click.start
+Variable.Local.sSQL.Declare(String)
+Variable.Local.sCust.Declare(String)
+
+Function.Intrinsic.Control.If(V.Screen.Form1!txtCutoff.text,=,"")
+	Function.Intrinsic.String.concat("DELETE FROM ATG_3690_Fob_Cutoffs WHERE CUSTOMER = '",V.Screen.Form1!txtCust.Text,"'",V.Local.sSQL)
+	Function.ODBC.Connection!con.Execute(V.Local.sSQL)
+Function.Intrinsic.Control.else
+	Function.Intrinsic.String.Concat("SELECT * FROM ATG_3690_Fob_Cutoffs WHERE CUSTOMER = '",V.Screen.Form1!txtCust.Text,"'",V.Local.sSQL)
+	Function.ODBC.Connection!con.OpenRecordsetRW("rst1",V.Local.sSQL)
+	Function.Intrinsic.Control.If(V.ODBC.con!rst1.EOF,=,True)
+		Function.ODBC.con!rst1.AddNew
+		Function.ODBC.con!rst1.Set!CUSTOMER(V.Screen.Form1!txtCust.text)
+	Function.Intrinsic.Control.EndIf
+	Function.ODBC.con!rst1.Set!FOB_CUTOFF(V.Screen.Form1!txtCutoff.Text)
+	Function.ODBC.con!rst1.Update
+	Function.ODBC.con!rst1.Close
+Function.Intrinsic.Control.EndIf
+
+Function.Intrinsic.Control.CallSub(Form1_unload)
+
+
+program.sub.cmdsave_click.end
+
+program.sub.form1_unload.start
+Function.Intrinsic.Control.End
+
+Function.ODBC.Connection!Con.close
+
+program.sub.form1_unload.end
+
+Program.Sub.LoadData.Start
+Variable.Local.sSQL.Declare(String)
+Variable.Local.sCust.Declare(String)
+
+V.Local.sCust.set(Variable.Passed.000002)
+
+Gui.Form1.txtCust.Text(V.Local.sCust)
+Function.Intrinsic.String.Concat("SELECT FOB_CUTOFF FROM ATG_3690_Fob_Cutoffs WHERE CUSTOMER = '",V.Local.sCust,"'",V.Local.sSQL)
+Function.ODBC.Connection!con.OpenRecordsetRO("rst1",V.Local.sSQL)
+Function.Intrinsic.Control.If(V.ODBC.con!rst1.EOF,=,False)
+	Gui.Form1.txtCutoff.Text(V.ODBC.con!rst1.FieldVal!FOB_CUTOFF)
+Function.Intrinsic.Control.EndIf
+Function.ODBC.con!rst1.Close
+
+
+Program.Sub.LoadData.End
+
+Program.Sub.Comments.Start
+${$0$}$ATG_3690_Fob_Cutoffs$}$JCT$}$4/5/2016
+${$1$}$$}$$}$0$}$14360$}$Script 1$}$4/5/2016 12:43:42 PM$}$(Program: AR0020GI; Screen: ARS002A1)
+
+Program.Sub.Comments.End
+
