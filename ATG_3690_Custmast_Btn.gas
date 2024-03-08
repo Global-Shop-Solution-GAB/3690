@@ -1,0 +1,23 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+' Renames Script 1 button
+' 4/7/2010
+' Hook 14350
+' JSO
+
+Variable.Passed.000201.Set("FOB Cutoffs")
+
+Program.Sub.Main.End
+
+Program.Sub.Comments.Start
+${$0$}$ATG_3690_Custmast_Btn$}$RLK$}$4/5/2016
+${$1$}$$}$$}$0$}$14350$}$Populate Hook$}$4/5/2016 10:09:04 AM$}$(Program: AR0020GI; Screen: ARS002A1)
+
+Program.Sub.Comments.End
+
