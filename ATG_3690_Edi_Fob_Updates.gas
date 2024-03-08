@@ -1,0 +1,202 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+' 4/1/2021
+' JSO
+' For House of Doolittle quote 1178
+' Bunch of data updates when an EDI order is received
+' 32501 - post EDI file delete (or direct to menu)
+
+
+Function.ODBC.Connection!con.OpenConnection(Variable.Ambient.PDSN,Variable.Ambient.PUser,Variable.Ambient.PPass,180)
+
+Function.Intrinsic.Control.CallSub(Orderupdates)
+
+Program.Sub.Main.End
+
+Program.Sub.OrderUpdates.Start
+V.Local.sSQL.Declare(String)
+V.Local.fExtensionSum.Declare(Float)
+V.Local.sOrder.Declare(String)
+V.Local.sCust.Declare(String)
+V.Local.iCutOff.Declare(Long)
+V.Local.sPrevorder.Declare(String)
+
+V.Local.fExtensionSum.Set(0)
+
+F.Intrinsic.UI.Msgbox("First set of Updates")
+
+' Update the BUY_GRP_CUST_NO in ORDER_HEADER
+V.Local.sSQL.Set("UPDATE ORDER_HEADER SET BUY_GRP_CUST_NO = (SELECT DISTINCT BUYING_GROUP.GROUP_CUST FROM BUYING_GROUP WHERE BUYING_GROUP.CUSTOMER = ORDER_HEADER.CUSTOMER) WHERE ORDER_HEADER.RECORD_TYPE = 'A' AND BUY_GRP_CUST_NO = ''")
+Function.odbc.connection!con.execute(Variable.local.sSQL)
+
+' Clear out custom table holding extension accumulations by order
+V.Local.sSQL.Set("DELETE FROM ATG_3690_Ordr_Totals")
+Function.ODBC.Connection!con.Execute(V.Local.sSQL)
+
+' Populate ATG_ORDER_TOTALS with summed up extensions by ORDER_NO
+'V.Local.sSQL.Set("SELECT ORDER_NO, EXTENSION FROM V_ORDER_LINES ORDER BY ORDER_NO")
+'Function.ODBC.Connection!con.OpenRecordsetRO("rst1",V.Local.sSQL)
+'V.Local.sOrder.Set(V.ODBC.con!rst1.FieldVal!ORDER_NO)
+'Function.Intrinsic.Control.DoUntil(V.ODBC.con!rst1.EOF,=,True)
+'	Function.Intrinsic.Control.If(V.Local.sOrder,<>,V.ODBC.con!rst1.FieldVal!ORDER_NO)
+'		' Next order hit	
+'		Function.intrinsic.String.Concat("SELECT * FROM ATG_ORDER_TOTALS WHERE ORDER_NO = '",V.Local.sOrder,"'",V.Local.sSQL)
+'		Function.ODBC.Connection!con.OpenRecordsetRW("rst2",V.Local.sSQL)
+'		Function.Intrinsic.Control.If(V.ODBC.con!rst2.EOF,=,True)
+'			Function.ODBC.con!rst2.AddNew
+'		Function.Intrinsic.Control.EndIf
+'		Function.ODBC.con!rst2.Set!ORDER_NO(V.Local.sOrder)
+'		Function.ODBC.con!rst2.Set!EXTENSION_SUM(V.Local.fExtensionSum)
+'		Function.ODBC.con!rst2.Update
+'		Function.ODBC.con!rst2.Close
+'		V.Local.fExtensionSum.Set(0)
+'	Function.Intrinsic.Control.EndIf
+'	Function.Intrinsic.Math.Add(V.Local.fExtensionSum,V.ODBC.con!rst1.FieldVal!Extension,V.Local.fExtensionSum)
+'	V.Local.sOrder.Set(V.ODBC.con!rst1.FieldVal!ORDER_NO)
+'	Function.ODBC.con!rst1.Movenext
+'Function.Intrinsic.Control.Loop
+'Function.ODBC.con!rst1.Close
+
+' 10/25/2013 -- jct --
+' be sure running total is initialized as 0
+V.Local.fExtensionSum.Set(0)
+
+' get list of order lines
+F.ODBC.Connection!con.OpenRecordsetRO("rst1","SELECT ORDER_NO, EXTENSION FROM V_ORDER_LINES ORDER BY ORDER_NO")
+
+	' get first order, for comparison
+	V.Local.sPrevorder.Set(V.ODBC.con!rst1.FieldVal!Order_No)
+
+	' loop through all order lines to get total by line
+	F.Intrinsic.Control.DoUntil(V.ODBC.con!rst1.EOF,=,True)
+
+		' if the order is the same, keep a running total of the extension on the order
+		F.Intrinsic.Control.If(V.Local.sPrevorder,=,V.ODBC.con!rst1.FieldVal!Order_No)
+			F.Intrinsic.Math.Add(V.Local.fExtensionSum,V.ODBC.con!rst1.FieldVal!Extension,V.Local.fExtensionSum)
+		F.Intrinsic.Control.Else
+
+			' when the order changes, update the ATG_Order_Totals, for the previous order
+			F.Intrinsic.String.Concat("select * from ATG_Order_Totals where Order_No='",V.Local.sPrevorder,"' ",V.Local.sSQL)
+			F.ODBC.Connection!con.OpenRecordsetRW("rst2",V.Local.sSQL)
+				F.Intrinsic.Control.If(V.ODBC.con!rst2.EOF,=,True)
+					F.ODBC.con!rst2.AddNew
+					F.ODBC.con!rst2.Set!Order_No(V.Local.sPrevorder)
+				F.Intrinsic.Control.EndIf
+					F.ODBC.con!rst2.Set!Extension_Sum(V.Local.fExtensionSum)
+					F.ODBC.con!rst2.Update
+			F.ODBC.con!rst2.Close
+
+			' reset the running total, not to 0, but to the first value of the new order.line
+			' reset the order no
+			V.Local.sPrevorder.Set(V.ODBC.con!rst1.FieldVal!Order_No)
+			V.Local.fExtensionSum.Set(V.ODBC.con!rst1.FieldVal!Extension)
+		F.Intrinsic.Control.EndIf
+	F.ODBC.con!rst1.MoveNext
+	F.Intrinsic.Control.Loop
+
+	' make sure to get the last value, also.  It will hit the EOF and not update in the loop
+	F.Intrinsic.String.Concat("select * from ATG_Order_Totals where Order_No='",V.Local.sPrevorder,"' ",V.Local.sSQL)
+	F.ODBC.Connection!con.OpenRecordsetRW("rst2",V.Local.sSQL)
+		F.Intrinsic.Control.If(V.ODBC.con!rst2.EOF,=,True)
+			F.ODBC.con!rst2.AddNew
+			F.ODBC.con!rst2.Set!Order_No(V.Local.sPrevorder)
+		F.Intrinsic.Control.EndIf
+			F.ODBC.con!rst2.Set!Extension_Sum(V.Local.fExtensionSum)
+			F.ODBC.con!rst2.Update
+	F.ODBC.con!rst2.Close
+
+F.ODBC.con!rst1.Close
+
+' Update the info fields in ORDER_LINES
+V.Local.sSQL.Set("UPDATE ORDER_LINES SET INFO_1 = (SELECT TEXT_INFO1 FROM INVENTORY_MST2 WHERE INVENTORY_MST2.PART = ORDER_LINES.PART AND INVENTORY_MST2.LOCATION = ORDER_LINES.LOCATION) WHERE RECORD_TYPE = 'L' AND PRODUCT_LINE BETWEEN '01' AND '07'")
+Function.ODBC.Connection!con.Execute(V.Local.sSQL)
+
+V.Local.sSQL.Set("UPDATE ORDER_LINES SET INFO_2 = (SELECT TEXT_INFO2 FROM INVENTORY_MST2 WHERE INVENTORY_MST2.PART = ORDER_LINES.PART AND INVENTORY_MST2.LOCATION = ORDER_LINES.LOCATION) WHERE RECORD_TYPE = 'L' AND PRODUCT_LINE BETWEEN '01' AND '07'")
+Function.ODBC.Connection!con.Execute(V.Local.sSQL)
+
+' --11/13/2013 -- jct --
+' per ANN, this update shold not occur
+'' Update the CARRIER_CDs
+'V.Local.sSQL.Set("UPDATE ORDER_HEADER SET CARRIER_CD = 'UPS' WHERE RECORD_TYPE = 'A'")
+'Function.ODBC.Connection!con.Execute(V.Local.sSQL)
+'
+'V.Local.sSQL.Set("UPDATE ORDER_SHIP_TO SET CARRIER_CD = 'UPS' WHERE RECORD_TYPE = 'C'")
+'Function.ODBC.Connection!con.Execute(V.Local.sSQL)
+
+Function.Intrinsic.Control.CallSub(Updatefob)
+
+	
+
+
+
+
+
+
+Program.Sub.OrderUpdates.End
+
+Program.Sub.UpdateFOB.Start
+V.Local.sSQL.Declare(String)
+V.Local.sOrder.Declare(String)
+V.Local.sCust.Declare(String)
+V.Local.iCutOff.Declare(Long)
+V.Local.fExtensionSum.Declare(Float)
+V.Local.sFOB.Declare(String)
+
+F.Intrinsic.UI.Msgbox("Updating FOB")
+
+' Update the FOB based on Extension SUM
+V.Local.sSQL.Set("SELECT ORDER_NO, CODE_FOB, CUSTOMER FROM ORDER_HEADER WHERE RECORD_TYPE = 'A' AND FLAG_DATA_CNV = 'E' AND ORDER_SUFFIX = '0000' ORDER BY ORDER_NO")
+Function.ODBC.Connection!con.OpenRecordsetRW("rst1",V.Local.sSQL)
+Function.Intrinsic.Control.DoUntil(V.ODBC.con!rst1.EOF,=,True)
+	V.local.sOrder.set(V.ODBC.con!rst1.fieldval!ORDER_NO)
+	V.local.sCust.set(V.odbc.con!rst1.fieldval!CUSTOMER)
+
+	Function.intrinsic.string.concat("SELECT FOB_CUTOFF FROM ATG_3690_Fob_Cutoffs WHERE CUSTOMER = '",V.local.sCust,"'",V.local.sSQL)
+	Function.odbc.connection!con.openrecordsetro("rst2",V.local.sSQL)
+	Function.intrinsic.control.if(V.ODBC.con!rst2.eof,=,False)
+		V.local.iCutOff.Set(V.ODBC.con!rst2.FieldVal!FOB_CUTOFF)
+	Function.intrinsic.control.else
+		V.Local.iCutOff.Set(2500)
+	Function.Intrinsic.control.endif
+	Function.ODBC.con!rst2.Close
+
+	V.Local.sFOB.Set("OUR DOCK")
+	Function.Intrinsic.String.Concat("SELECT EXTENSION_SUM FROM  ATG_3690_Ordr_Totals WHERE ORDER_NO = '",V.Local.sOrder,"'",V.Local.sSQL)
+	Function.ODBC.Connection!con.openrecordsetro("rst3",V.Local.sSQL)
+	Function.Intrinsic.Control.If(V.ODBC.con!rst3.EOF,=,False)
+		V.Local.fExtensionSum.Set(V.ODBC.con!rst3.FieldVal!EXTENSION_SUM)
+		Function.Intrinsic.Control.If(V.Local.fExtensionSum,>=,V.Local.iCutOff)
+			V.Local.sFOB.Set("DESTINATION")
+		Function.Intrinsic.Control.EndIf
+	Function.Intrinsic.Control.EndIf
+	Function.ODBC.con!rst3.Close
+
+	Function.ODBC.con!rst1.Set!CODE_FOB(V.Local.sFOB)
+	Function.ODBC.con!rst1.Update
+
+Function.ODBC.con!rst1.MoveNext
+Function.Intrinsic.Control.Loop
+Function.ODBC.con!rst1.Close
+
+F.Intrinsic.UI.Msgbox("All Updates Complete")
+
+Program.Sub.UpdateFOB.End
+
+Program.Sub.Comments.Start
+${$0$}$atg_edi_fob_updates$}$JCT$}$10/25/2013
+${$1$}$$}$$}$0$}$32501$}$Post EDI File Delete$}$4/5/2016 12:40:44 PM$}$(Program: ORD040GI; Screen: )
+
+${$3$}$0$}$$}$-1$}$-1$}$$}$1/1/1900$}$10/25/2013 -- jct --
+007300-101420130832-4
+FOB not always updating; looks like it wouldn't grab the total extension.  I made modifications to sub OrderUpdates to fix.
+--
+${$4$}$0$}$$}$0$}$-1$}$JCT$}$10/25/2013 1:59:37 PM$}$007300-101420130832-4
+FOB not always updating; looks like it wouldn't grab the total extension.  I made modifications to sub OrderUpdates to fix.
+Program.Sub.Comments.End
+
